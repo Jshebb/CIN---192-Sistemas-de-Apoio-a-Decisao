@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Crown, Download, ListOrdered, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, Crown, Download, Info, ListOrdered, Plus, X } from "lucide-react";
 import {
   CriterionInput,
   PreferenceType,
@@ -188,6 +188,9 @@ export default function Home() {
             φ⁺, φ⁻ e φ líquido.
           </p>
         </header>
+
+        {/* ---------------- Sobre o Método ---------------- */}
+        <MethodGuide />
 
         {/* ---------------- 0. Problema ---------------- */}
         <ProblemBar
@@ -634,6 +637,208 @@ export default function Home() {
         </footer>
       </main>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MethodGuide — seção explicativa sobre o PROMETHEE II e definição de pesos
+// ---------------------------------------------------------------------------
+function MethodGuide() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card className="mb-6 [--card-spacing:--spacing(5)]">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Info className="size-4 shrink-0 text-muted-foreground" />
+          Sobre o método &amp; como preencher
+        </CardTitle>
+        <CardAction>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+          >
+            {open ? (
+              <><ChevronUp className="size-4" /> Recolher</>
+            ) : (
+              <><ChevronDown className="size-4" /> Ver guia</>
+            )}
+          </Button>
+        </CardAction>
+      </CardHeader>
+
+      {open && (
+        <CardContent className="space-y-6 text-sm text-muted-foreground">
+
+          {/* ---- O que é ---- */}
+          <div className="space-y-2">
+            <h3 className="font-semibold text-foreground">O que é o PROMETHEE II?</h3>
+            <p>
+              O <strong className="text-foreground">PROMETHEE II</strong> (<em>Preference Ranking Organization
+              METHod for Enrichment Evaluations</em>) é um método de apoio à decisão multicritério que
+              produz um <strong className="text-foreground">ranking completo</strong> de alternativas com base
+              em múltiplos critérios, potencialmente conflitantes.
+            </p>
+            <p>
+              Desenvolvido por Brans, Vincke &amp; Mareschal (1986), o método compara cada par de
+              alternativas em cada critério e agrega as preferências em um{" "}
+              <strong className="text-foreground">fluxo líquido φ</strong>: quanto maior o φ, melhor a
+              alternativa. O resultado é simples de interpretar e estável a pequenas variações nos
+              parâmetros.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* ---- Fluxos ---- */}
+          <div className="space-y-2">
+            <h3 className="font-semibold text-foreground">Como o cálculo funciona (resumo)</h3>
+            <ol className="list-decimal space-y-1.5 pl-4">
+              <li>
+                Para cada par de alternativas <em>a, b</em> e cada critério <em>j</em>, calcula-se o
+                desvio <code className="rounded bg-muted px-1 text-foreground">d = g(a) − g(b)</code>.
+              </li>
+              <li>
+                O desvio é convertido em grau de preferência{" "}
+                <code className="rounded bg-muted px-1 text-foreground">P(d) ∈ [0,1]</code> pela{" "}
+                <strong className="text-foreground">função de preferência</strong> escolhida para o critério.
+              </li>
+              <li>
+                Os graus são combinados ponderadamente:{" "}
+                <code className="rounded bg-muted px-1 text-foreground">π(a,b) = Σ wⱼ · Pⱼ(a,b)</code>.
+              </li>
+              <li>
+                Calcula-se o <strong className="text-foreground">fluxo positivo</strong>{" "}
+                <code className="rounded bg-muted px-1 text-foreground">φ⁺</code> (quanto <em>a</em> supera as
+                demais) e o <strong className="text-foreground">fluxo negativo</strong>{" "}
+                <code className="rounded bg-muted px-1 text-foreground">φ⁻</code> (quanto <em>a</em> é
+                superada).
+              </li>
+              <li>
+                O <strong className="text-foreground">fluxo líquido</strong>{" "}
+                <code className="rounded bg-muted px-1 text-foreground">φ = φ⁺ − φ⁻</code> determina o
+                ranking: maior φ = melhor alternativa.
+              </li>
+            </ol>
+          </div>
+
+          <Separator />
+
+          {/* ---- Pesos ---- */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-foreground">Como definir os pesos</h3>
+            <p>
+              Os pesos expressam a <strong className="text-foreground">importância relativa</strong> de cada
+              critério para o decisor. Eles <em>não</em> precisam somar 1 — a aplicação os
+              normaliza automaticamente antes do cálculo.
+            </p>
+
+            <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
+              <p className="font-medium text-foreground">Abordagens práticas para escolher pesos</p>
+              <ul className="list-disc space-y-1.5 pl-4">
+                <li>
+                  <strong className="text-foreground">Escala 0–10:</strong> atribua uma nota de importância a
+                  cada critério (ex.: Custo = 8, Qualidade = 10, Prazo = 5). Intuitivo e fácil de
+                  justificar.
+                </li>
+                <li>
+                  <strong className="text-foreground">Pesos iguais:</strong> use 1 para todos os critérios se
+                  não há razão para diferenciar importâncias. Útil como ponto de partida.
+                </li>
+                <li>
+                  <strong className="text-foreground">Porcentagens:</strong> distribua 100 pontos entre os
+                  critérios conforme a relevância de cada um para a decisão em questão.
+                </li>
+                <li>
+                  <strong className="text-foreground">Análise de sensibilidade:</strong> rode o cálculo com
+                  pesos diferentes e veja se o ranking muda. Se não mudar muito, o resultado é robusto.
+                </li>
+              </ul>
+            </div>
+
+            <p className="text-xs">
+              O indicador <strong className="text-foreground">Σ pesos</strong> no cabeçalho da seção de
+              critérios mostra a soma atual — apenas para referência, pois a normalização é automática.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* ---- Funções de preferência ---- */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-foreground">Funções de preferência e seus parâmetros</h3>
+            <p>
+              Para cada critério, escolha a função que melhor representa como o decisor percebe
+              diferenças de desempenho:
+            </p>
+
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Função</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Parâmetros</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Quando usar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {[
+                    {
+                      name: "I — Usual",
+                      params: "—",
+                      desc: "Qualquer diferença gera preferência estrita. Use quando não há tolerância a desvios.",
+                    },
+                    {
+                      name: "II — Quase (U)",
+                      params: "q",
+                      desc: "Diferenças ≤ q são indiferentes; acima disso, preferência estrita. Use quando há uma tolerância clara.",
+                    },
+                    {
+                      name: "III — Linear (V)",
+                      params: "p",
+                      desc: "Preferência cresce linearmente até p, depois é estrita. Use quando a preferência aumenta gradualmente.",
+                    },
+                    {
+                      name: "IV — Nível",
+                      params: "q, p",
+                      desc: "Indiferença até q, preferência fraca entre q e p, estrita acima de p. Bom para critérios com zonas distintas.",
+                    },
+                    {
+                      name: "V — Linear c/ indiferença",
+                      params: "q, p",
+                      desc: "Indiferença até q, crescimento linear de q a p, estrita depois. O mais comum na prática.",
+                    },
+                    {
+                      name: "VI — Gaussiana",
+                      params: "s",
+                      desc: "Curva suave sem descontinuidades. Use quando a transição entre indiferença e preferência é gradual e contínua.",
+                    },
+                  ].map((row) => (
+                    <tr key={row.name} className="hover:bg-muted/10">
+                      <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{row.name}</td>
+                      <td className="px-3 py-2 font-mono text-foreground">{row.params}</td>
+                      <td className="px-3 py-2">{row.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-1">
+              <p className="font-medium text-foreground text-xs">Significado dos parâmetros</p>
+              <ul className="text-xs space-y-1 pl-3">
+                <li><strong className="text-foreground">q (limiar de indiferença):</strong> diferença máxima abaixo da qual o decisor considera as alternativas equivalentes.</li>
+                <li><strong className="text-foreground">p (limiar de preferência):</strong> diferença mínima acima da qual há preferência estrita.</li>
+                <li><strong className="text-foreground">s (Gaussiana):</strong> desvio padrão da curva — controla a "suavidade" da transição. Valor próximo a (p−q)/2 é um bom ponto de partida.</li>
+              </ul>
+            </div>
+          </div>
+
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
