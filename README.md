@@ -46,7 +46,7 @@ promethee/
 │   │       ├── flows.py                  # φ⁺, φ⁻, φ + fluxos unicritério
 │   │       ├── promethee_ii.py           # ranking completo
 │   │       └── gaia.py                   # projeção PCA → plano GAIA
-│   └── tests/                # pytest (19 testes)
+│   └── tests/                # pytest (72 testes)
 └── frontend/                 # Next.js + TypeScript + Tailwind
     └── src/
         ├── app/
@@ -95,8 +95,11 @@ docker compose up --build        # backend :8000  ·  frontend :3000
 ### Testes
 
 ```bash
-cd backend && pytest             # 19 testes
+cd backend && pytest             # 72 testes
 ```
+
+A suíte cobre funções de preferência, fluxos PROMETHEE, ranking, validação dos
+schemas, camada de serviço, API, CORS, exportação CSV/PDF e plano GAIA.
 
 ## 📡 API
 
