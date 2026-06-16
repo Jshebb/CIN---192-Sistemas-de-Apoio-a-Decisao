@@ -26,7 +26,14 @@ Projeto da **Fase 2 — Projetos de Desenvolvimento**.
   linear, gaussiana).
 - **Plano GAIA** (PCA) com alternativas, vetores de critério e eixo de decisão π.
 - Visualização do ranking (gráfico de barras de φ líquido).
-- **Exportação** dos resultados em **CSV** e **PDF**.
+- **Validação guiada** no frontend: erros de pesos, limiares q/p/s e nomes
+  duplicados aparecem inline (e bloqueiam o cálculo) antes de chamar a API.
+- **Análise de sensibilidade dos pesos**: intervalo de estabilidade de cada
+  critério (de quanto o peso pode variar sem mudar o ranking / o 1º colocado).
+- **Comparação de cenários** lado a lado: capture rankings com pesos diferentes
+  e veja como cada alternativa se move.
+- **Exportação** dos resultados em **CSV** e **PDF** — relatório completo com
+  critérios, pesos, matriz, funções, limiares, ranking, índice π e GAIA.
 - **API REST documentada** com Swagger/OpenAPI em `/docs`.
 
 ## 🏗️ Arquitetura
@@ -38,21 +45,24 @@ promethee/
 │   │   ├── main.py           # app FastAPI + CORS + /health
 │   │   ├── schemas.py        # contrato Pydantic (entrada/saída)
 │   │   ├── api/
-│   │   │   ├── routes.py     # /api/solve, /api/export/{csv,pdf}
+│   │   │   ├── routes.py     # /api/solve, /api/sensitivity, /api/export/{csv,pdf}
 │   │   │   ├── service.py    # ponte API ↔ núcleo MCDM
 │   │   │   └── export.py     # geração de CSV e PDF
 │   │   └── core/             # núcleo MCDM (Python puro, sem FastAPI)
 │   │       ├── preference_functions.py  # 6 funções de preferência
 │   │       ├── flows.py                  # φ⁺, φ⁻, φ + fluxos unicritério
 │   │       ├── promethee_ii.py           # ranking completo
+│   │       ├── sensitivity.py            # intervalos de estabilidade de peso
 │   │       └── gaia.py                   # projeção PCA → plano GAIA
-│   └── tests/                # pytest (19 testes)
+│   └── tests/                # pytest (78 testes)
 └── frontend/                 # Next.js + TypeScript + Tailwind
     └── src/
         ├── app/
         │   ├── page.tsx      # wizard (critérios → alternativas → resultado)
-        │   └── components/   # RankingChart, GaiaPlane
-        └── lib/api.ts        # tipos + cliente da API
+        │   └── components/   # RankingChart, GaiaPlane, SensitivityPanel, ScenarioComparison
+        └── lib/
+            ├── api.ts        # tipos + cliente da API
+            └── validation.ts # validação guiada (pesos, limiares, nomes)
 ```
 
 **Princípio de design:** o núcleo MCDM (`core/`) não importa nada de FastAPI —
@@ -95,18 +105,22 @@ docker compose up --build        # backend :8000  ·  frontend :3000
 ### Testes
 
 ```bash
-cd backend && pytest             # 19 testes
+cd backend && pytest             # 78 testes
 ```
+
+A suíte cobre funções de preferência, fluxos PROMETHEE, ranking, validação dos
+schemas, camada de serviço, API, CORS, exportação CSV/PDF e plano GAIA.
 
 ## 📡 API
 
-| Método | Rota                | Descrição                                  |
-|--------|---------------------|--------------------------------------------|
-| POST   | `/api/solve`        | Resolve via PROMETHEE II (ranking + GAIA)  |
-| POST   | `/api/export/csv`   | Baixa o ranking em CSV                      |
-| POST   | `/api/export/pdf`   | Baixa o ranking em PDF                      |
-| GET    | `/health`           | Healthcheck                                |
-| GET    | `/docs`             | Documentação interativa (Swagger)          |
+| Método | Rota                 | Descrição                                       |
+|--------|----------------------|-------------------------------------------------|
+| POST   | `/api/solve`         | Resolve via PROMETHEE II (ranking + GAIA)       |
+| POST   | `/api/sensitivity`   | Intervalos de estabilidade de peso por critério |
+| POST   | `/api/export/csv`    | Baixa o relatório completo em CSV               |
+| POST   | `/api/export/pdf`    | Baixa o relatório completo em PDF               |
+| GET    | `/health`            | Healthcheck                                     |
+| GET    | `/docs`              | Documentação interativa (Swagger)               |
 
 Exemplo de payload (`POST /api/solve`):
 
@@ -135,10 +149,14 @@ Exemplo de payload (`POST /api/solve`):
 ## ☁️ Deploy
 
 - **Frontend → Vercel**: importe o repositório, defina *Root Directory* =
-  `frontend` e a variável `NEXT_PUBLIC_API_URL` apontando para a API.
-- **Backend → Railway**: importe o repositório, *Root Directory* = `backend`
-  (usa `railway.json` / `Procfile` / `Dockerfile`) e defina `CORS_ORIGINS` com
-  a URL do frontend na Vercel.
+  `frontend` e a variável `NEXT_PUBLIC_API_URL` apontando para a URL pública da
+  API no Render (sem barra final, ex.: `https://<sua-api>.onrender.com`).
+  Como é uma variável `NEXT_PUBLIC_`, ela é embutida no build — após alterá-la é
+  preciso **refazer o deploy** na Vercel.
+- **Backend → Render**: importe o repositório, *Root Directory* = `backend`
+  (usa `Procfile` / `Dockerfile`; `PORT` é injetado pelo Render) e defina
+  `CORS_ORIGINS` com a URL do frontend na Vercel (várias separadas por vírgula).
+  Sem `CORS_ORIGINS`, o navegador bloqueia as requisições do frontend por CORS.
 
 ## 📐 O método PROMETHEE II (resumo)
 

@@ -28,12 +28,25 @@ class CriterionInput(BaseModel):
             raise ValueError(f"Critério '{self.name}': parâmetro p é obrigatório para {self.preference.value}")
         if self.preference == PreferenceType.GAUSSIAN and self.s is None:
             raise ValueError(f"Critério '{self.name}': parâmetro s é obrigatório para gaussian")
+        if self.q is not None and self.q < 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro q deve ser >= 0")
+        if self.p is not None and self.p < 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser >= 0")
+        if self.s is not None and self.s <= 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro s deve ser > 0")
+        if self.preference == PreferenceType.V_SHAPE and self.p is not None and self.p <= 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser > 0 para v_shape")
+        if self.preference == PreferenceType.LEVEL and self.q is not None and self.p is not None and self.p < self.q:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser >= q para level")
+        if self.preference == PreferenceType.LINEAR and self.q is not None and self.p is not None and self.p <= self.q:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser > q para linear")
         return self
 
 
 class SolveRequest(BaseModel):
     """Requisição para resolver um problema PROMETHEE II."""
 
+    name: str | None = Field(None, description="Nome do problema (usado nos relatórios)")
     alternatives: list[str] = Field(..., min_length=2, examples=[["Carro A", "Carro B", "Carro C"]])
     criteria: list[CriterionInput] = Field(..., min_length=1)
     matrix: list[list[float]] = Field(
@@ -50,6 +63,13 @@ class SolveRequest(BaseModel):
         for i, row in enumerate(self.matrix):
             if len(row) != m:
                 raise ValueError(f"Linha {i} tem {len(row)} valores, esperado {m} (critérios).")
+        return self
+
+    @model_validator(mode="after")
+    def _unique_criteria(self) -> "SolveRequest":
+        names = [c.name for c in self.criteria]
+        if len(set(names)) != len(names):
+            raise ValueError("Nomes de critérios devem ser únicos.")
         return self
 
     @field_validator("alternatives")
@@ -89,3 +109,21 @@ class SolveResponse(BaseModel):
     preference_index: list[list[float]] = Field(
         ..., description="Índice de preferência agregado π (n×n)"
     )
+
+
+class CriterionStabilityOutput(BaseModel):
+    """Intervalo de estabilidade do peso de um critério (espaço normalizado)."""
+
+    name: str
+    weight: float = Field(..., description="Peso normalizado atual")
+    rank_lower: float = Field(..., description="Limite inferior p/ ranking completo estável")
+    rank_upper: float = Field(..., description="Limite superior p/ ranking completo estável")
+    winner_lower: float = Field(..., description="Limite inferior p/ 1º colocado estável")
+    winner_upper: float = Field(..., description="Limite superior p/ 1º colocado estável")
+
+
+class SensitivityResponse(BaseModel):
+    """Análise de sensibilidade dos pesos: intervalos de estabilidade."""
+
+    base_order: list[str] = Field(..., description="Ranking atual (do 1º ao último)")
+    criteria: list[CriterionStabilityOutput]

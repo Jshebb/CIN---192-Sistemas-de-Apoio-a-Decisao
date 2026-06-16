@@ -52,6 +52,63 @@ def _pairwise_diff(column: np.ndarray) -> np.ndarray:
     return column[:, None] - column[None, :]
 
 
+def criterion_preference_matrices(
+    matrix: np.ndarray,
+    criteria: list[CriterionSpec],
+) -> np.ndarray:
+    """Grau de preferência ``P_k(a, b)`` por critério, sem pesos.
+
+    Devolve um array ``(m, n, n)`` onde a fatia ``k`` é a matriz de
+    preferência do critério ``k`` (já orientada para maximização e com a
+    diagonal zerada). Como não depende dos pesos, pode ser calculada uma
+    única vez e reaproveitada para varrer diferentes vetores de peso —
+    base da análise de sensibilidade.
+    """
+    matrix = np.asarray(matrix, dtype=float)
+    n, m = matrix.shape
+    if m != len(criteria):
+        raise ValueError(
+            f"Nº de critérios ({len(criteria)}) difere das colunas da matriz ({m})."
+        )
+
+    mats = np.zeros((m, n, n), dtype=float)
+    for k, spec in enumerate(criteria):
+        diff = _pairwise_diff(matrix[:, k])
+        if not spec.maximize:
+            diff = -diff  # critério de minimização → inverte a orientação
+        p_k = apply_preference(diff, spec.preference, q=spec.q, p=spec.p, s=spec.s)
+        np.fill_diagonal(p_k, 0.0)
+        mats[k] = p_k
+    return mats
+
+
+def normalize_weights(criteria: list[CriterionSpec]) -> np.ndarray:
+    """Pesos dos critérios normalizados para somar 1 (com validação)."""
+    weights = np.array([c.weight for c in criteria], dtype=float)
+    if np.any(weights < 0):
+        raise ValueError("Pesos não podem ser negativos.")
+    total = weights.sum()
+    if total <= 0:
+        raise ValueError("A soma dos pesos deve ser positiva.")
+    return weights / total
+
+
+def flows_from_preference_matrices(
+    pref_matrices: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Agrega ``P_k`` ponderado e devolve ``(π, φ⁺, φ⁻, φ)``.
+
+    ``weights`` deve estar normalizado (somar 1). Função pura e barata,
+    pensada para ser chamada muitas vezes na varredura de sensibilidade.
+    """
+    preference_index = np.tensordot(weights, pref_matrices, axes=(0, 0))
+    n = preference_index.shape[0]
+    phi_plus = preference_index.sum(axis=1) / (n - 1)
+    phi_minus = preference_index.sum(axis=0) / (n - 1)
+    return preference_index, phi_plus, phi_minus, phi_plus - phi_minus
+
+
 def compute_flows(
     matrix: np.ndarray,
     criteria: list[CriterionSpec],
@@ -78,35 +135,17 @@ def compute_flows(
             f"Nº de critérios ({len(criteria)}) difere das colunas da matriz ({m})."
         )
 
-    weights = np.array([c.weight for c in criteria], dtype=float)
-    if np.any(weights < 0):
-        raise ValueError("Pesos não podem ser negativos.")
-    total = weights.sum()
-    if total <= 0:
-        raise ValueError("A soma dos pesos deve ser positiva.")
-    weights = weights / total
+    weights = normalize_weights(criteria)
+    pref_matrices = criterion_preference_matrices(matrix, criteria)
 
-    preference_index = np.zeros((n, n), dtype=float)
-    unicriterion_flows = np.zeros((n, m), dtype=float)
+    preference_index, phi_plus, phi_minus, phi_net = flows_from_preference_matrices(
+        pref_matrices, weights
+    )
 
-    for k, spec in enumerate(criteria):
-        column = matrix[:, k]
-        diff = _pairwise_diff(column)
-        if not spec.maximize:
-            diff = -diff  # critério de minimização → inverte a orientação
-
-        p_k = apply_preference(diff, spec.preference, q=spec.q, p=spec.p, s=spec.s)
-        np.fill_diagonal(p_k, 0.0)
-
-        preference_index += weights[k] * p_k
-
-        # fluxo líquido unicritério (normalizado por n-1) para o GAIA
-        uni = (p_k.sum(axis=1) - p_k.sum(axis=0)) / (n - 1)
-        unicriterion_flows[:, k] = uni
-
-    phi_plus = preference_index.sum(axis=1) / (n - 1)
-    phi_minus = preference_index.sum(axis=0) / (n - 1)
-    phi_net = phi_plus - phi_minus
+    # fluxo líquido unicritério (normalizado por n-1) para o GAIA
+    unicriterion_flows = (
+        pref_matrices.sum(axis=2) - pref_matrices.sum(axis=1)
+    ).T / (n - 1)
 
     return FlowResult(
         phi_plus=phi_plus,
