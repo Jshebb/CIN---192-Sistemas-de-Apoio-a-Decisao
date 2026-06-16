@@ -10,10 +10,13 @@ import numpy as np
 from ..core.flows import CriterionSpec
 from ..core.gaia import compute_gaia
 from ..core.promethee_ii import rank
+from ..core.sensitivity import weight_stability
 from ..schemas import (
+    CriterionStabilityOutput,
     GaiaOutput,
     GaiaPoint,
     ScoreOutput,
+    SensitivityResponse,
     SolveRequest,
     SolveResponse,
 )
@@ -72,4 +75,26 @@ def solve(req: SolveRequest) -> SolveResponse:
         scores=scores,
         gaia=gaia,
         preference_index=result.flows.preference_index.tolist(),
+    )
+
+
+def sensitivity(req: SolveRequest) -> SensitivityResponse:
+    """Calcula os intervalos de estabilidade de peso de cada critério."""
+    matrix = np.asarray(req.matrix, dtype=float)
+    specs = _to_specs(req)
+    result = weight_stability(matrix, specs)
+
+    return SensitivityResponse(
+        base_order=[req.alternatives[i] for i in result.base_order],
+        criteria=[
+            CriterionStabilityOutput(
+                name=c.name,
+                weight=c.weight,
+                rank_lower=c.rank_lower,
+                rank_upper=c.rank_upper,
+                winner_lower=c.winner_lower,
+                winner_upper=c.winner_upper,
+            )
+            for c in result.criteria
+        ],
     )

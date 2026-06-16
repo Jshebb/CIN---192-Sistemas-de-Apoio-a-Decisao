@@ -1,7 +1,16 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Crown, Download, ListOrdered, Plus, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Crown,
+  Download,
+  ListOrdered,
+  Plus,
+  X,
+} from "lucide-react";
 import {
   CriterionInput,
   PreferenceType,
@@ -14,6 +23,7 @@ import {
   solve,
 } from "@/lib/api";
 import { TEMPLATES, type Problem } from "@/lib/templates";
+import { validateProblem } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,6 +57,8 @@ import { FlowQuadrantChart } from "./components/FlowQuadrantChart";
 import { PreferenceHeatmap } from "./components/PreferenceHeatmap";
 import { PreferenceFunctionChart } from "./components/PreferenceFunctionChart";
 import { ProblemBar } from "./components/ProblemBar";
+import { SensitivityPanel } from "./components/SensitivityPanel";
+import { ScenarioComparison } from "./components/ScenarioComparison";
 
 // Ponto de partida editável (também disponível como template).
 const EXAMPLE: Problem = TEMPLATES[0].problem;
@@ -61,6 +73,8 @@ export default function Home() {
   const [matrix, setMatrix] = useState<number[][]>(EXAMPLE.matrix);
   const [openScale, setOpenScale] = useState<number | null>(null);
   const [result, setResult] = useState<SolveResponse | null>(null);
+  // Snapshot do problema que gerou `result` (pode divergir do estado editado).
+  const [solvedProblem, setSolvedProblem] = useState<Problem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -69,12 +83,15 @@ export default function Home() {
     [criteria],
   );
 
-  function buildRequest(): SolveRequest {
-    return { alternatives, criteria, matrix };
-  }
-
-  // Estado atual como um Problem completo (para salvar/exportar).
+  // Estado atual como um Problem completo (para salvar/exportar/validar).
   const problem: Problem = { name, alternatives, criteria, matrix };
+
+  // Validação guiada: erros bloqueantes e avisos calculados ao vivo.
+  const validation = useMemo(() => validateProblem(problem), [problem]);
+
+  function buildRequest(): SolveRequest {
+    return { name, alternatives, criteria, matrix };
+  }
 
   function loadProblem(p: Problem) {
     setName(p.name);
@@ -83,17 +100,21 @@ export default function Home() {
     setMatrix(p.matrix);
     setOpenScale(null);
     setResult(null);
+    setSolvedProblem(null);
     setError(null);
   }
 
   async function handleSolve() {
+    if (!validation.ok) return;
     setLoading(true);
     setError(null);
     try {
       setResult(await solve(buildRequest()));
+      setSolvedProblem(structuredClone(problem));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro desconhecido");
       setResult(null);
+      setSolvedProblem(null);
     } finally {
       setLoading(false);
     }
@@ -232,11 +253,18 @@ export default function Home() {
                   {criteria.map((c, i) => {
                     const params = PREFERENCE_PARAMS[c.preference];
                     const isQualitative = Array.isArray(c.scale);
+                    const hasError = validation.criterionErrors.has(i);
                     return (
                       <Fragment key={i}>
-                      <TableRow>
+                      <TableRow className={hasError ? "bg-destructive/5" : undefined}>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
+                            {hasError && (
+                              <AlertTriangle
+                                className="size-4 shrink-0 text-destructive"
+                                aria-label="Critério com parâmetros inválidos"
+                              />
+                            )}
                             <Input
                               className="w-44"
                               value={c.name}
@@ -508,10 +536,28 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        {/* ---------------- Validação guiada ---------------- */}
+        {(validation.errors.length > 0 || validation.warnings.length > 0) && (
+          <ValidationSummary
+            errors={validation.errors.map((e) => e.message)}
+            warnings={validation.warnings.map((w) => w.message)}
+          />
+        )}
+
         <div className="mb-10 flex flex-wrap items-center gap-4">
-          <Button size="lg" onClick={handleSolve} disabled={loading} className="px-6">
+          <Button
+            size="lg"
+            onClick={handleSolve}
+            disabled={loading || !validation.ok}
+            className="px-6"
+          >
             {loading ? "Calculando…" : "Calcular ranking"}
           </Button>
+          {!validation.ok && (
+            <p className="text-sm text-muted-foreground">
+              Corrija os {validation.errors.length} erro(s) acima para calcular.
+            </p>
+          )}
           {error && (
             <p role="alert" className="text-sm font-medium text-destructive">
               {error}
@@ -613,6 +659,29 @@ export default function Home() {
                   alternatives={alternatives}
                   preferenceIndex={result.preference_index}
                 />
+              </CardContent>
+            </Card>
+
+            <Card className="[--card-spacing:--spacing(5)]">
+              <CardHeader>
+                <CardTitle>Análise de sensibilidade dos pesos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SensitivityPanel
+                  request={(() => {
+                    const p = solvedProblem ?? problem;
+                    return { name: p.name, alternatives: p.alternatives, criteria: p.criteria, matrix: p.matrix };
+                  })()}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="[--card-spacing:--spacing(5)]">
+              <CardHeader>
+                <CardTitle>Comparação de cenários</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScenarioComparison current={{ problem: solvedProblem ?? problem, result }} />
               </CardContent>
             </Card>
 
@@ -725,6 +794,41 @@ function MetricCard({
 
 function formatSigned(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(4)}`;
+}
+
+function ValidationSummary({
+  errors,
+  warnings,
+}: {
+  errors: string[];
+  warnings: string[];
+}) {
+  return (
+    <div className="mb-6 space-y-3">
+      {errors.length > 0 && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <p className="mb-1.5 flex items-center gap-2 text-sm font-medium text-destructive">
+            <AlertTriangle className="size-4" />
+            {errors.length === 1 ? "1 problema impede o cálculo" : `${errors.length} problemas impedem o cálculo`}
+          </p>
+          <ul className="ml-6 list-disc space-y-0.5 text-sm text-destructive/90">
+            {errors.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {warnings.length > 0 && (
+        <div className="rounded-lg border border-chart-3/40 bg-chart-3/5 p-4">
+          <ul className="ml-6 list-disc space-y-0.5 text-sm text-muted-foreground">
+            {warnings.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ScaleEditor({

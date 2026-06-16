@@ -90,16 +90,36 @@ def test_cors_allows_local_frontend_origin():
     assert resp.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_export_csv():
-    resp = client.post("/api/export/csv", json=PAYLOAD)
+def _csv_section(content: str, title: str) -> list[dict[str, str]]:
+    """Extrai as linhas (como dicts) da seção que começa em ``# <title>``."""
+    lines = content.splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.startswith(title))
+    block = []
+    for ln in lines[start + 1 :]:
+        if ln == "" or ln.startswith("#"):
+            break
+        block.append(ln)
+    return list(csv.DictReader(io.StringIO("\n".join(block))))
+
+
+def test_export_csv_has_full_model_and_ranking():
+    resp = client.post("/api/export/csv", json={**PAYLOAD, "name": "Estudo X"})
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
-    assert b"Rank" in resp.content
     content = resp.content.decode("utf-8-sig")
-    rows = list(csv.DictReader(io.StringIO(content)))
-    assert [row["Alternativa"] for row in rows] == ["B", "A", "C"]
-    assert [row["Rank"] for row in rows] == ["1", "2", "3"]
-    assert rows[0]["Phi (líquido)"] == "0.9600"
+
+    # relatório completo: critérios, matriz, ranking e índice π
+    assert "# Critérios" in content
+    assert "# Matriz de avaliação" in content
+    assert "Estudo X" in content
+
+    ranking = _csv_section(content, "# Ranking")
+    assert [row["Alternativa"] for row in ranking] == ["B", "A", "C"]
+    assert [row["Rank"] for row in ranking] == ["1", "2", "3"]
+    assert ranking[0]["Phi (líquido)"] == "0.9600"
+
+    criteria = _csv_section(content, "# Critérios")
+    assert {row["Critério"] for row in criteria} == {"Custo", "Qualidade"}
 
 
 def test_export_pdf():
@@ -107,3 +127,32 @@ def test_export_pdf():
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content[:4] == b"%PDF"
+
+
+def test_sensitivity_returns_interval_per_criterion():
+    resp = client.post("/api/sensitivity", json=PAYLOAD)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["base_order"] == ["B", "A", "C"]
+    assert [c["name"] for c in data["criteria"]] == ["Custo", "Qualidade"]
+    for c in data["criteria"]:
+        # intervalos coerentes e contendo o peso atual
+        assert 0.0 <= c["rank_lower"] <= c["weight"] <= c["rank_upper"] <= 1.0
+        assert c["winner_lower"] <= c["weight"] <= c["winner_upper"]
+        # estabilidade do 1º colocado é ao menos tão ampla quanto a do ranking
+        assert c["winner_lower"] <= c["rank_lower"]
+        assert c["winner_upper"] >= c["rank_upper"]
+
+
+def test_duplicate_criteria_names_rejected():
+    bad = {
+        **PAYLOAD,
+        "criteria": [
+            {"name": "Custo", "weight": 0.5, "preference": "usual"},
+            {"name": "Custo", "weight": 0.5, "preference": "usual"},
+        ],
+        "matrix": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+    }
+    resp = client.post("/api/solve", json=bad)
+    assert resp.status_code == 422
+    assert "critérios devem ser únicos" in resp.text

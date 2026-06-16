@@ -32,6 +32,7 @@ export interface CriterionInput {
 }
 
 export interface SolveRequest {
+  name?: string | null;
   alternatives: string[];
   criteria: CriterionInput[];
   matrix: number[][];
@@ -62,6 +63,20 @@ export interface SolveResponse {
   scores: ScoreOutput[];
   gaia: GaiaOutput | null;
   preference_index: number[][];
+}
+
+export interface CriterionStability {
+  name: string;
+  weight: number;
+  rank_lower: number;
+  rank_upper: number;
+  winner_lower: number;
+  winner_upper: number;
+}
+
+export interface SensitivityResponse {
+  base_order: string[];
+  criteria: CriterionStability[];
 }
 
 // Quais parâmetros (q/p/s) cada tipo de função de preferência exige.
@@ -116,6 +131,10 @@ function formatError(detail: unknown): string | null {
 
 export function solve(req: SolveRequest): Promise<SolveResponse> {
   return postJson<SolveResponse>("/api/solve", req);
+}
+
+export function sensitivity(req: SolveRequest): Promise<SensitivityResponse> {
+  return postJson<SensitivityResponse>("/api/sensitivity", req);
 }
 
 export async function exportFile(
