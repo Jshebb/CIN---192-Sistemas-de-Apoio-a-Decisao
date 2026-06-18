@@ -13,6 +13,7 @@ import {
   exportFile,
   solve,
 } from "@/lib/api";
+import { exportPdfFull } from "@/lib/exportPdf";
 import { TEMPLATES, type Problem } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import {
@@ -534,7 +535,7 @@ export default function Home() {
                   <Button variant="outline" size="sm" onClick={() => exportFile("csv", buildRequest())}>
                     <Download /> CSV
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportFile("pdf", buildRequest())}>
+                  <Button variant="outline" size="sm" onClick={() => exportPdfFull(name, result)}>
                     <Download /> PDF
                   </Button>
                 </CardAction>
@@ -596,14 +597,16 @@ export default function Home() {
                     </Table>
                   </div>
 
-                  <div className="rounded-lg border bg-muted/10 p-4">
+                  <div id="chart-flow-quadrant" className="rounded-lg border bg-muted/10 p-4">
                     <h3 className="mb-3 text-sm font-medium">Diagnóstico dos fluxos</h3>
                     <FlowQuadrantChart scores={result.scores} />
                   </div>
                 </div>
 
                 <Separator />
-                <RankingChart scores={result.scores} />
+                <div id="chart-ranking">
+                  <RankingChart scores={result.scores} />
+                </div>
               </CardContent>
             </Card>
 
@@ -612,10 +615,12 @@ export default function Home() {
                 <CardTitle>Preferência agregada</CardTitle>
               </CardHeader>
               <CardContent>
-                <PreferenceHeatmap
-                  alternatives={alternatives}
-                  preferenceIndex={result.preference_index}
-                />
+                <div id="chart-heatmap">
+                  <PreferenceHeatmap
+                    alternatives={alternatives}
+                    preferenceIndex={result.preference_index}
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -625,7 +630,9 @@ export default function Home() {
                   <CardTitle>Plano GAIA</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <GaiaPlane gaia={result.gaia} />
+                  <div id="chart-gaia">
+                    <GaiaPlane gaia={result.gaia} />
+                  </div>
                 </CardContent>
               </Card>
             )}

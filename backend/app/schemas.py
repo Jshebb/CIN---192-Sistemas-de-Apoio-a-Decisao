@@ -54,9 +54,17 @@ class SolveRequest(BaseModel):
 
     @field_validator("alternatives")
     @classmethod
-    def _unique_names(cls, v: list[str]) -> list[str]:
+    def _unique_alternatives(cls, v: list[str]) -> list[str]:
         if len(set(v)) != len(v):
             raise ValueError("Nomes de alternativas devem ser únicos.")
+        return v
+
+    @field_validator("criteria")
+    @classmethod
+    def _unique_criteria(cls, v: list[CriterionInput]) -> list[CriterionInput]:
+        names = [c.name for c in v]
+        if len(set(names)) != len(names):
+            raise ValueError("Nomes de critérios devem ser únicos.")
         return v
 
 
