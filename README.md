@@ -6,7 +6,7 @@ problemas de decisão multicritério sem conhecimento técnico do método.
 
 Projeto da **Fase 2 — Projetos de Desenvolvimento**.
 
-## 📄 Artigos base
+## Artigos base
 
 - **Brans, J.P. & Vincke, Ph. (1986).** *A Preference Ranking Organisation Method
   (The PROMETHEE Method for Multiple Criteria Decision-Making).* Management
@@ -16,7 +16,7 @@ Projeto da **Fase 2 — Projetos de Desenvolvimento**.
   on methodologies and applications.* European Journal of Operational Research.
   <https://www.sciencedirect.com/science/article/abs/pii/S0377221709000071>
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 - Entrada intuitiva de **critérios** (peso, objetivo de max/min, função de
   preferência e limiares) e de **alternativas** (matriz de avaliação).
@@ -29,7 +29,7 @@ Projeto da **Fase 2 — Projetos de Desenvolvimento**.
 - **Exportação** dos resultados em **CSV** e **PDF**.
 - **API REST documentada** com Swagger/OpenAPI em `/docs`.
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
 promethee/
@@ -46,7 +46,7 @@ promethee/
 │   │       ├── flows.py                  # φ⁺, φ⁻, φ + fluxos unicritério
 │   │       ├── promethee_ii.py           # ranking completo
 │   │       └── gaia.py                   # projeção PCA → plano GAIA
-│   └── tests/                # pytest (19 testes)
+│   └── tests/                # pytest (72 testes)
 └── frontend/                 # Next.js + TypeScript + Tailwind
     └── src/
         ├── app/
@@ -59,7 +59,7 @@ promethee/
 é Python puro e testável isoladamente contra os números dos artigos. A API é
 uma casca fina por cima.
 
-## 🚀 Como rodar localmente
+## Como rodar localmente
 
 ### Pré-requisitos
 - Python 3.11+ e Node.js 20+
@@ -95,10 +95,13 @@ docker compose up --build        # backend :8000  ·  frontend :3000
 ### Testes
 
 ```bash
-cd backend && pytest             # 19 testes
+cd backend && pytest             # 72 testes
 ```
 
-## 📡 API
+A suíte cobre funções de preferência, fluxos PROMETHEE, ranking, validação dos
+schemas, camada de serviço, API, CORS, exportação CSV/PDF e plano GAIA.
+
+## API
 
 | Método | Rota                | Descrição                                  |
 |--------|---------------------|--------------------------------------------|
@@ -132,15 +135,15 @@ Exemplo de payload (`POST /api/solve`):
 | V — Linear c/ indiferença | `linear`| `q`, `p`   |
 | VI — Gaussiana | `gaussian`        | `s`        |
 
-## ☁️ Deploy
+## Deploy
 
 - **Frontend → Vercel**: importe o repositório, defina *Root Directory* =
   `frontend` e a variável `NEXT_PUBLIC_API_URL` apontando para a API.
-- **Backend → Railway**: importe o repositório, *Root Directory* = `backend`
+- **Backend → Render**: importe o repositório, *Root Directory* = `backend`
   (usa `railway.json` / `Procfile` / `Dockerfile`) e defina `CORS_ORIGINS` com
   a URL do frontend na Vercel.
 
-## 📐 O método PROMETHEE II (resumo)
+## O método PROMETHEE II (resumo)
 
 1. Para cada par de alternativas e cada critério, calcula-se o grau de
    preferência `P_k(a,b)` via função de preferência.
@@ -149,7 +152,7 @@ Exemplo de payload (`POST /api/solve`):
 4. Fluxo líquido `φ(a) = φ⁺(a) − φ⁻(a)` → **ranking completo** (maior φ = melhor).
 5. **GAIA**: projeção PCA dos fluxos unicritério num plano 2D para análise visual.
 
-## 👥 Equipe
+## Equipe
 
 - João Henrique Silva Ebbers
 - Thiago Felipe

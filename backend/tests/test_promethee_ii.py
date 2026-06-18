@@ -132,3 +132,48 @@ def test_hydroelectric_u_shape_vs_usual():
     # Com Tipo I, x1 sobe para 5º e x3 cai para 6º
     assert by_rank[5] == "x1"
     assert by_rank[6] == "x3"
+
+
+def test_ranking_keeps_ties_with_shared_rank_and_stable_order():
+    matrix = np.array([[10.0], [10.0], [5.0]])
+    criteria = [CriterionSpec(name="g1", weight=1.0, preference=PreferenceType.USUAL)]
+
+    result = rank(matrix, criteria, ["A", "B", "C"])
+
+    assert [(score.name, score.rank) for score in result.scores] == [
+        ("A", 1),
+        ("B", 1),
+        ("C", 3),
+    ]
+    np.testing.assert_allclose([score.phi_net for score in result.scores], [0.5, 0.5, -1.0])
+
+
+def test_ranking_matches_mixed_cost_quality_problem():
+    matrix = np.array(
+        [
+            [100.0, 70.0],
+            [80.0, 60.0],
+            [120.0, 90.0],
+        ]
+    )
+    criteria = [
+        CriterionSpec("Cost", 2.0, maximize=False, preference=PreferenceType.USUAL),
+        CriterionSpec("Quality", 1.0, maximize=True, preference=PreferenceType.V_SHAPE, p=40.0),
+    ]
+
+    result = rank(matrix, criteria, ["A", "B", "C"])
+
+    assert [(score.name, score.rank) for score in result.scores] == [
+        ("B", 1),
+        ("A", 2),
+        ("C", 3),
+    ]
+    np.testing.assert_allclose([score.phi_net for score in result.scores], [1.0 / 2.0, -1.0 / 24.0, -11.0 / 24.0])
+
+
+def test_ranking_rejects_alternative_name_mismatch():
+    matrix = np.array([[1.0], [2.0]])
+    criteria = [CriterionSpec(name="g1", weight=1.0, preference=PreferenceType.USUAL)]
+
+    with pytest.raises(ValueError, match="nomes difere"):
+        rank(matrix, criteria, ["A"])

@@ -28,6 +28,18 @@ class CriterionInput(BaseModel):
             raise ValueError(f"Critério '{self.name}': parâmetro p é obrigatório para {self.preference.value}")
         if self.preference == PreferenceType.GAUSSIAN and self.s is None:
             raise ValueError(f"Critério '{self.name}': parâmetro s é obrigatório para gaussian")
+        if self.q is not None and self.q < 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro q deve ser >= 0")
+        if self.p is not None and self.p < 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser >= 0")
+        if self.s is not None and self.s <= 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro s deve ser > 0")
+        if self.preference == PreferenceType.V_SHAPE and self.p is not None and self.p <= 0:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser > 0 para v_shape")
+        if self.preference == PreferenceType.LEVEL and self.q is not None and self.p is not None and self.p < self.q:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser >= q para level")
+        if self.preference == PreferenceType.LINEAR and self.q is not None and self.p is not None and self.p <= self.q:
+            raise ValueError(f"Critério '{self.name}': parâmetro p deve ser > q para linear")
         return self
 
 
