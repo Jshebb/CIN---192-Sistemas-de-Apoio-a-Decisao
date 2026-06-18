@@ -57,19 +57,23 @@ def solve(req: SolveRequest) -> SolveResponse:
 
     gaia: GaiaOutput | None = None
     if len(req.criteria) >= 2:
-        g = compute_gaia(result.flows.unicriterion_flows, result.flows.weights)
-        gaia = GaiaOutput(
-            alternatives=[
-                GaiaPoint(name=req.alternatives[i], x=float(g.alternatives[i, 0]), y=float(g.alternatives[i, 1]))
-                for i in range(len(req.alternatives))
-            ],
-            criteria=[
-                GaiaPoint(name=req.criteria[k].name, x=float(g.criteria[k, 0]), y=float(g.criteria[k, 1]))
-                for k in range(len(req.criteria))
-            ],
-            decision_axis=GaiaPoint(name="π", x=float(g.decision_axis[0]), y=float(g.decision_axis[1])),
-            quality=g.quality,
-        )
+        try:
+            g = compute_gaia(result.flows.unicriterion_flows, result.flows.weights)
+        except Exception:
+            g = None
+        if g is not None:
+            gaia = GaiaOutput(
+                alternatives=[
+                    GaiaPoint(name=req.alternatives[i], x=float(g.alternatives[i, 0]), y=float(g.alternatives[i, 1]))
+                    for i in range(len(req.alternatives))
+                ],
+                criteria=[
+                    GaiaPoint(name=req.criteria[k].name, x=float(g.criteria[k, 0]), y=float(g.criteria[k, 1]))
+                    for k in range(len(req.criteria))
+                ],
+                decision_axis=GaiaPoint(name="π", x=float(g.decision_axis[0]), y=float(g.decision_axis[1])),
+                quality=g.quality,
+            )
 
     return SolveResponse(
         scores=scores,

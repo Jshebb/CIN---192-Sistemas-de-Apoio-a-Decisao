@@ -69,6 +69,71 @@ def test_dimension_mismatch_raises():
         )
 
 
+# ---------------------------------------------------------------------------
+# Caso canônico: Brans, Vincke & Mareschal (1986) — seleção de projetos
+# hidrelétricos. Todos os 6 tipos de função de preferência são exercitados.
+# Ranking esperado: x5 > x2 > x4 > x6 > x3 > x1
+# ---------------------------------------------------------------------------
+
+_HYDRO_MATRIX = np.array([
+    [80, 90,  6,  5.4, 8,  5],   # x1
+    [65, 58,  2,  9.7, 1,  1],   # x2
+    [83, 60,  4,  7.2, 4,  7],   # x3
+    [40, 80, 10,  7.5, 7, 10],   # x4
+    [52, 72,  6,  2.0, 3,  8],   # x5
+    [94, 96,  7,  3.6, 5,  6],   # x6
+], dtype=float)
+
+_HYDRO_CRITERIA = [
+    # f1 — Mão-de-obra:              Min, Tipo II  (U-shape),      q=10
+    CriterionSpec("f1", weight=1/6, maximize=False, preference=PreferenceType.U_SHAPE,  q=10),
+    # f2 — Potência (MW):            Max, Tipo III (V-shape),      p=30
+    CriterionSpec("f2", weight=1/6, maximize=True,  preference=PreferenceType.V_SHAPE,  p=30),
+    # f3 — Custo construção (10⁹$): Min, Tipo V   (Linear+indif.), q=0.5, p=5
+    CriterionSpec("f3", weight=1/6, maximize=False, preference=PreferenceType.LINEAR,   q=0.5, p=5),
+    # f4 — Custo manutenção (10⁶$): Min, Tipo IV  (Nível),        q=1, p=6
+    CriterionSpec("f4", weight=1/6, maximize=False, preference=PreferenceType.LEVEL,    q=1,   p=6),
+    # f5 — Vilarejos a evacuar:      Min, Tipo I   (Usual)
+    CriterionSpec("f5", weight=1/6, maximize=False, preference=PreferenceType.USUAL),
+    # f6 — Nível de segurança:       Max, Tipo VI  (Gaussiana),    s=5
+    CriterionSpec("f6", weight=1/6, maximize=True,  preference=PreferenceType.GAUSSIAN, s=5),
+]
+
+_HYDRO_NAMES = ["x1", "x2", "x3", "x4", "x5", "x6"]
+
+
+def test_hydroelectric_ranking():
+    """Ranking canônico deve ser x5 > x2 > x4 > x6 > x3 > x1."""
+    result = rank(_HYDRO_MATRIX, _HYDRO_CRITERIA, _HYDRO_NAMES)
+    by_rank = {s.rank: s.name for s in result.scores}
+    assert by_rank == {1: "x5", 2: "x2", 3: "x4", 4: "x6", 5: "x3", 6: "x1"}
+
+
+def test_hydroelectric_phi_net():
+    """Fluxos líquidos devem corresponder aos valores do artigo original (Brans 1986)."""
+    result = rank(_HYDRO_MATRIX, _HYDRO_CRITERIA, _HYDRO_NAMES)
+    phi = {s.name: s.phi_net for s in result.scores}
+    assert phi["x5"] == pytest.approx(+0.2929, abs=1e-3)
+    assert phi["x2"] == pytest.approx(+0.0172, abs=1e-3)
+    assert phi["x4"] == pytest.approx(-0.0200, abs=1e-3)
+    assert phi["x6"] == pytest.approx(-0.0549, abs=1e-3)
+    assert phi["x3"] == pytest.approx(-0.0895, abs=1e-3)
+    assert phi["x1"] == pytest.approx(-0.1457, abs=1e-3)
+
+
+def test_hydroelectric_u_shape_vs_usual():
+    """Usar Tipo I em vez de Tipo II para f1 inverte x1 e x3 nas posições 5-6."""
+    criteria_wrong = list(_HYDRO_CRITERIA)
+    criteria_wrong[0] = CriterionSpec(
+        "f1", weight=1/6, maximize=False, preference=PreferenceType.USUAL
+    )
+    result = rank(_HYDRO_MATRIX, criteria_wrong, _HYDRO_NAMES)
+    by_rank = {s.rank: s.name for s in result.scores}
+    # Com Tipo I, x1 sobe para 5º e x3 cai para 6º
+    assert by_rank[5] == "x1"
+    assert by_rank[6] == "x3"
+
+
 def test_ranking_keeps_ties_with_shared_rank_and_stable_order():
     matrix = np.array([[10.0], [10.0], [5.0]])
     criteria = [CriterionSpec(name="g1", weight=1.0, preference=PreferenceType.USUAL)]

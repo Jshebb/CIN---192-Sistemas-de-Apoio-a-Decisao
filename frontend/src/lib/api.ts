@@ -153,5 +153,5 @@ export async function exportFile(
   a.href = url;
   a.download = `promethee_ii.${format}`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }

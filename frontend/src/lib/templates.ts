@@ -128,4 +128,35 @@ export const TEMPLATES: Template[] = [
       ],
     },
   },
+  {
+    id: "hidreletrica",
+    label: "Projetos hidrelétricos",
+    description: "Caso canônico de Brans, Vincke & Mareschal (1986). 6 alternativas, 6 critérios, pesos iguais.",
+    problem: {
+      name: "Seleção de projetos hidrelétricos",
+      alternatives: ["x1", "x2", "x3", "x4", "x5", "x6"],
+      criteria: [
+        // f1 — Mão-de-obra: Min, Tipo II (Quase), q=10
+        { name: "Mão-de-obra", weight: 1, maximize: false, preference: "u_shape", q: 10 },
+        // f2 — Potência (MW): Max, Tipo III (V-shape), p=30
+        { name: "Potência (MW)", weight: 1, maximize: true, preference: "v_shape", p: 30 },
+        // f3 — Custo construção (10⁹$): Min, Tipo V (V+indif), q=0.5, p=5
+        { name: "Custo construção (10⁹$)", weight: 1, maximize: false, preference: "linear", q: 0.5, p: 5 },
+        // f4 — Custo manutenção (10⁶$): Min, Tipo IV (Nível), q=1, p=6
+        { name: "Custo manutenção (10⁶$)", weight: 1, maximize: false, preference: "level", q: 1, p: 6 },
+        // f5 — Vilarejos a evacuar: Min, Tipo I (Usual)
+        { name: "Vilarejos a evacuar", weight: 1, maximize: false, preference: "usual" },
+        // f6 — Nível de segurança: Max, Tipo VI (Gaussiana), s=5
+        { name: "Nível de segurança", weight: 1, maximize: true, preference: "gaussian", s: 5 },
+      ],
+      matrix: [
+        [80, 90,  6,  5.4, 8,  5],
+        [65, 58,  2,  9.7, 1,  1],
+        [83, 60,  4,  7.2, 4,  7],
+        [40, 80, 10,  7.5, 7, 10],
+        [52, 72,  6,  2.0, 3,  8],
+        [94, 96,  7,  3.6, 5,  6],
+      ],
+    },
+  },
 ];
